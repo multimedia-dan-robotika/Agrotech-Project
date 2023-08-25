@@ -1,59 +1,22 @@
-    #include <Wire.h>
+#include <SoftwareSerial.h>
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <elapsedMillis.h>
 #include <WiFi.h>
-#include <SoftwareSerial.h>
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-#define RE 17
-#define DE 16
-SoftwareSerial mod(26,25);
+SoftwareSerial mySerial(26, 25);  // RX, TX
 
 const char* ssid            = "muro";
-const char* password        = "Piscok2000";
-
-
-// ===================================================================
-//                          TUTORIAL
-const byte temp[] = {0x01,0x03, 0x00, 0x13, 0x00, 0x01, 0x75, 0xcf};//
-const byte mois[]  = {0x01,0x03,0x00,0x12,0x00,0x01,0x24,0x0F};
-const byte econ[] = {0x01,0x03, 0x00, 0x15, 0x00, 0x01, 0x95, 0xce};
-const byte ph[] = {0x01,0x03, 0x00, 0x06, 0x00, 0x01, 0x64, 0x0b};//0x0B64
-const byte nitro[] = { 0x01, 0x03, 0x00, 0x1E, 0x00, 0x01, 0xE4, 0x0C };
-const byte phos[] = { 0x01, 0x03, 0x00, 0x1f, 0x00, 0x01, 0xb5, 0xcc };
-const byte pota[] = { 0x01, 0x03, 0x00, 0x20, 0x00, 0x01, 0x85, 0xc0 };
-// =====================================================================
-
-// const byte mois[] = {0x01, 0x03, 0x08, 0x02, 0x92, 0x57, 0xB6};
-// const byte temp[] = {0x01, 0x03, 0x08, 0xFF, 0x9B, 0x57, 0xB6};
-// const byte econ[] = {0x01, 0x03, 0x08, 0x03, 0xE8, 0x57, 0xB6};
-// const byte ph[] = {0x01, 0x03, 0x08, 0x00, 0x38, 0x57, 0xB6};
-// const byte nitro[]={0x01,0x03, 0x00, 0x1e, 0x00, 0x01, 0xe4, 0x0c};
-// const byte phos[]={0x01,0x03, 0x00, 0x1f, 0x00, 0x01, 0xb5, 0xcc};
-// const byte pota[]    = {0x01,0x03, 0x00, 0x20, 0x00, 0x01, 0x85, 0xc0};
-byte values[11];
-byte MoisValue, TempValue, ECValue, PHValue, NValue, PValue, KValue;
-byte SensorReading = 1;
-
-
-//                    TUTORIAL
-float envhumidity = 0.0, envtemperature = 0.0, soil_ph = 0.0, soil_mois = 0.0, soil_temp = 0.0;
-byte val1 = 0, val2 = 0, val3 = 0, val4 = 0,val5 = 0, val6 = 0, val7 = 0;
-
-const unsigned long intervalInput   = 3000;   // Interval baca sensor (ms)
-const unsigned long intervalOutput  = 1000;   // Interval print LCD (ms)
-const unsigned long intervalUpload  = 20000;  // Interval kirim ke Firebase (ms)
-
-elapsedMillis elapsedInput;
-elapsedMillis elapsedOutput;
-elapsedMillis elapsedUpload;
+const char* password        = "Piscok2000"; 
 
 void setup() {
-  lcd.begin();
+  Serial.begin(9600);
+  mySerial.begin(4800);
+
+  lcd.init();
   lcd.backlight();
-  //Connect Wifi
-  Serial.begin(115200);
-  mod.begin(4800);
+  //Wifi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
@@ -67,8 +30,8 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Connected to WiFi   ");
   delay(5000);
-//LCD SET
-  lcd.setCursor(0, 0);
+//Display
+   lcd.setCursor(0, 0);
   lcd.print("PH   :              ");
   lcd.setCursor(0, 1);
   lcd.print("EC   :              ");
@@ -82,294 +45,79 @@ void setup() {
   lcd.print("P : ");
   lcd.setCursor(12,2 );
   lcd.print("K : ");
-
-pinMode(RE, OUTPUT);
-pinMode(DE, OUTPUT);
-
-}
-
-//        TUTORIAL 
-void loop() {
-// ElapsedMillis
-
-
-
-  // put your main code here, to run repeatedly:
-  val1 = moisture();
-  if (elapsedInput >= intervalInput)
-  {
-    if (SensorReading == 1)
-    {
-      SensorRead();
-      SensorReading = 0;      
-    }
-    else
-    {
-      //Do Nothing
-    }
-    elapsedInput = 0;
-  }
-
-if (elapsedOutput >= intervalOutput)
-{
-   lcd.setCursor(7,0);
-   lcd.print(soil_ph);
-   lcd.setCursor(7,1);
-   lcd.print(val3);  
-   lcd.setCursor(7,2);
-   lcd.print(soil_mois);
-   lcd.setCursor(7,3);
-   lcd.print(soil_temp);
-   lcd.setCursor(16,0);
-   lcd.print(val4);
-   lcd.setCursor(16,1);
-   lcd.print(val5);
-   lcd.setCursor(16,2);
-   lcd.print(val6);
-}
-
-  soil_mois = val1/1.8;
-  delay(1000);
-  soil_temp = temperature()/10.0;
-  delay(1000);
-  val3 = econduc();
-  delay(1000);
-  val4 = phydrogen()/25;
-  soil_ph = val4;
-  delay(1000);
-  val5 = nitrogen();
-  delay(1000);
-  val6 = phosphorous();
-  delay(1000);
-  val7 = potassium();
-  delay(1000);
-
-  Serial.print("Moisture: ");
-  Serial.print(soil_mois);
-  Serial.println(" %");
-  delay(1000);
-  Serial.print("Temperature: ");
-  Serial.print(soil_temp);
-  Serial.println(" C");
-  delay(1000);
-  Serial.print("EC: ");Serial.print(val3);Serial.println(" us/cm");
-  delay(1000);
-  Serial.print("ph: ");Serial.print(soil_ph);Serial.println(" ph");
-  delay(1000);
-  Serial.print("Nitrogen: "); Serial.print(val5);Serial.println(" mg/kg");
-  delay(1000);
-  Serial.print("Phosphorous: ");Serial.print(val6);Serial.println(" mg/kg");
-  delay(1000);
-  Serial.print("Potassium: ");Serial.print(val7);Serial.println(" mg/kg");
-  Serial.println();
   delay(3000);
+
 }
 
-void SensorRead(){
-NValue = nitrogen();
-  delay (250);
-  PValue = potassium();
-  delay (250);
-  KValue = phosphorous();
-  delay (250);
-  PHValue = phydrogen();
-  delay (250);
-  ECValue = econduc();
-  delay (250);
-  MoisValue = moisture();
-  delay(250);
-  TempValue = temperature();
-  delay(250);
-}
+void loop() {
 
-byte moisture() {
-  // clear the receive buffer
-  mod.flush();
+  byte queryData[] = {0x01, 0x03, 0x00, 0x00, 0x00, 0x07, 0x04, 0x08};
+  byte receivedData[19];
 
-  // switch RS-485 to transmit mode
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
+  mySerial.write(queryData, sizeof(queryData));  // Send the query data to the NPK sensor
+  delay(1000);  // Wait for 1 second
 
-  // write out the message
-  for (uint8_t i = 0; i < sizeof(mois); i++) mod.write(mois[i]);
+  if (mySerial.available() >= sizeof(receivedData)) {  // Check if there are enough bytes available to read
+    mySerial.readBytes(receivedData, sizeof(receivedData));  // Read the received data into the receivedData array
 
-  // wait for the transmission to complete
-  mod.flush();
+    // Parse and print the received data in decimal format
+    unsigned int soilHumidity = (receivedData[3] << 8) | receivedData[4];
+    unsigned int soilTemperature = (receivedData[5] << 8) | receivedData[6];
+    unsigned int soilConductivity = (receivedData[7] << 8) | receivedData[8];
+    unsigned int soilPH = (receivedData[9] << 8) | receivedData[10];
+    unsigned int nitrogen = (receivedData[11] << 8) | receivedData[12];
+    unsigned int phosphorus = (receivedData[13] << 8) | receivedData[14];
+    unsigned int potassium = (receivedData[15] << 8) | receivedData[16];
 
-  // switching RS485 to receive mode
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
+    Serial.print("Soil Humidity: ");
+    Serial.println((float)soilHumidity / 10.0);
+    Serial.print("Soil Temperature: ");
+    Serial.println((float)soilTemperature / 10.0);
+    Serial.print("Soil Conductivity: ");
+    Serial.println(soilConductivity);
+    Serial.print("Soil pH: ");
+    Serial.println((int)soilPH / 10.0);
+    Serial.print("Nitrogen: ");
+    Serial.println(nitrogen);
+    Serial.print("Phosphorus: ");
+    Serial.println(phosphorus);
+    Serial.print("Potassium: ");
+    Serial.println(potassium);
 
-  // delay to allow response bytes to be received!
-  delay(200);
-
-  // read in the received bytes
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
+    lcd.setCursor(6,0);
+   lcd.print("    ");
+   lcd.setCursor(7,0);
+   lcd.print((float)soilPH / 10.0);
+   lcd.setCursor(6,1);
+   lcd.print("    ");
+   lcd.setCursor(7,1);
+   lcd.print(soilConductivity);
+   lcd.setCursor(6,2);
+   lcd.print("    "); 
+   lcd.setCursor(7,2);
+   lcd.print((int)soilHumidity / 10);
+   lcd.setCursor(10,2);
+   lcd.print("%");
+   lcd.setCursor(6,3);
+   lcd.print("    ");
+   lcd.setCursor(7,3);
+   lcd.print((int)soilTemperature / 10);
+   lcd.setCursor(10,3);
+   lcd.print(char(223));
+   lcd.print("C");
+   lcd.setCursor(16,0);
+   lcd.print("   ");
+   lcd.setCursor(16,0);
+   lcd.print(nitrogen);
+   lcd.setCursor(16,1);
+   lcd.print("   ");
+   lcd.setCursor(16,1);
+   lcd.print(phosphorus);
+   lcd.setCursor(16,2);
+   lcd.print("   ");
+   lcd.setCursor(16,2);
+   lcd.print(potassium);
+   lcd.setCursor(15,3);
+   lcd.print("mg/kg");
   }
-  return values[4];
-}
-
-byte temperature() {
-  // clear the receive buffer
-  mod.flush();
-
-  // switch RS-485 to transmit mode
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-
-  // write out the message
-  for (uint8_t i = 0; i < sizeof(temp); i++) mod.write(temp[i]);
-
-  // wait for the transmission to complete
-  mod.flush();
-
-  // switching RS485 to receive mode
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-
-  // delay to allow response bytes to be received!
-  delay(200);
-
-  // read in the received bytes
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[3]<<8|values[4];
-}
-
-byte econduc() {
-  // clear the receive buffer
-  mod.flush();
-
-  // switch RS-485 to transmit mode
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-
-  // write out the message
-  for (uint8_t i = 0; i < sizeof(econ); i++) mod.write(econ[i]);
-
-  // wait for the transmission to complete
-  mod.flush();
-
-  // switching RS485 to receive mode
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-
-  // delay to allow response bytes to be received!
-  delay(200);
-
-  // read in the received bytes
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[4];
-}
-
-byte phydrogen() {
-  // clear the receive buffer
-  mod.flush();
-  // switch RS-485 to transmit mode
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-
-  // write out the message
-  for (uint8_t i = 0; i < sizeof(ph); i++) mod.write(ph[i]);
-
-  // wait for the transmission to complete
-  mod.flush();
-
-  // switching RS485 to receive mode
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-
-  // delay to allow response bytes to be received!
-  delay(200);
-
-  // read in the received bytes
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[4];
-}
-
-byte nitrogen() {
-  // clear the receive buffer
-  mod.flush();
-
-  // switch RS-485 to transmit mode
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-
-  // write out the message
-  for (uint8_t i = 0; i < sizeof(nitro); i++) mod.write(nitro[i]);
-
-  // wait for the transmission to complete
-  mod.flush();
-
-  // switching RS485 to receive mode
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-
-  // delay to allow response bytes to be received!
-  delay(200);
-
-  // read in the received bytes
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[4];
-}
-
-byte phosphorous() {
-  mod.flush();
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-  for (uint8_t i = 0; i < sizeof(phos); i++) mod.write(phos[i]);
-  mod.flush();
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-  // delay to allow response bytes to be received!
-  delay(200);
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[4];
-}
-
-byte potassium() {
-  mod.flush();
-  digitalWrite(DE, HIGH);
-  digitalWrite(RE, HIGH);
-  delay(1);
-  for (uint8_t i = 0; i < sizeof(pota); i++) mod.write(pota[i]);
-  mod.flush();
-  digitalWrite(DE, LOW);
-  digitalWrite(RE, LOW);
-  // delay to allow response bytes to be received!
-  delay(200);
-  for (byte i = 0; i < 7; i++) {
-    values[i] = mod.read();
-    // Serial.print(values[i], HEX);
-    // Serial.print(' ');
-  }
-  return values[4];
 }
