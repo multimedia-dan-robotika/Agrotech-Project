@@ -1,0 +1,10 @@
+nilai x masing-masing indikator
+nilai x ini dikali dengan nilai sensor yang ada dibaca oleh mikon
+
+PH = 
+EC = EC*1,296
+Moist =
+Temp =
+N  = N*1,347
+P  = P*1,792
+K  = K*1,22
